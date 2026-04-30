@@ -2,6 +2,8 @@
 
 Syntax highlighting support for the [Rux](https://rux-lang.dev) programming language in [Sublime Text](https://www.sublimetext.com) editor.
 
+![Rux syntax highlighting preview](https://raw.githubusercontent.com/rux-lang/SublimeText/main/images/preview.png)
+
 ## Features
 
 - **Syntax highlighting** for `.rux` source files
