@@ -7,7 +7,6 @@ Syntax highlighting support for the [Rux](https://rux-lang.dev) programming lang
 ## Features
 
 - **Syntax highlighting** for `.rux` source files
-- **Markdown code fence injection** — Rux code inside ` ```rux ` blocks in `.md` files is highlighted automatically
 - Highlights the following language constructs:
 
 | Category        | Elements                                                                    |
@@ -41,7 +40,7 @@ Please report issues on the [GitHub issue tracker](https://github.com/rux-lang/S
 
 ### 0.1.0
 
-Initial release with full syntax highlighting for Rux source files and Markdown code fence injection.
+Initial release with full syntax highlighting for the Rux source files.
 
 ## License
 
