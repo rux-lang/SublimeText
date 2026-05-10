@@ -7,13 +7,12 @@ file_extensions:
 scope: source.rux
 
 contexts:
-  # Automatically included in every code context.
-  # Opt out with `meta_include_prototype: false` where it would be wrong (strings, comment bodies).
   prototype:
     - include: block-comments
     - include: comments
 
   main:
+    - include: attributes
     - include: constants
     - include: functions
     - include: types
@@ -21,7 +20,24 @@ contexts:
     - include: punctuation
     - include: strings
 
-  # ── Block comments ──────────────────────────────────────────────────────────
+  attributes:
+    - match: '@\['
+      scope: punctuation.definition.attribute.begin.rux
+      push:
+        - meta_scope: meta.attribute.rux
+        - match: '\]'
+          scope: punctuation.definition.attribute.end.rux
+          pop: true
+        - match: '\b([A-Za-z_][A-Za-z0-9_]*)\b(?=\s*\()'
+          captures:
+            1: entity.name.function.attribute.rux
+        - match: '\b([a-z_][a-zA-Z0-9_]*)\b(?=\s*:)'
+          captures:
+            1: variable.parameter.rux
+        - include: strings
+        - include: constants
+        - match: '[(),:]'
+          scope: punctuation.section.attribute.rux
 
   block-comments:
     - match: '/\*\*/'
@@ -45,19 +61,15 @@ contexts:
           pop: true
         - include: block-comments
 
-  # ── Line comments ────────────────────────────────────────────────────────────
-
   comments:
-    - match: "(///).*$"
+    - match: '(///).*$'
       scope: comment.line.documentation.rux
       captures:
         1: punctuation.definition.comment.rux
-    - match: "(//).*$"
+    - match: '(//).*$'
       scope: comment.line.double-slash.rux
       captures:
         1: punctuation.definition.comment.rux
-
-  # ── Numeric and boolean constants ────────────────────────────────────────────
 
   constants:
     - match: '\b\d[\d_]*(\.?)[\d_]*(?:(E|e)([+-]?)([\d_]+))?(f8|f16|f32|f80|f64|f128|f256|f512|i8|i16|i32|i64|i128|i256|i512|u8|u16|u32|u64|u128|u256|u512)?\b'
@@ -82,55 +94,76 @@ contexts:
         1: entity.name.type.numeric.rux
     - match: '\b(true|false|null)\b'
       scope: constant.language.bool.rux
-
-  # ── Functions ────────────────────────────────────────────────────────────────
+    - match: '(#)(package|module|file|function|line|column|date|time)\b'
+      captures:
+        1: punctuation.definition.constant.rux
+        2: constant.language.compiletime.rux
 
   functions:
     - match: '\bfunc\b'
       scope: keyword.other.rux
-      push: function-definition
-
-  function-definition:
-    # Match: name<T, U>(  — captures name, generic brackets, opening paren
-    - match: '\s+([a-zA-Z_][a-zA-Z0-9_]*)(?:\s*(<)\s*([A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)\s*(>))?(\()'
-      captures:
-        1: entity.name.function.rux
-        2: punctuation.definition.generic.begin.rux
-        3: entity.name.type.rux
-        4: punctuation.definition.generic.end.rux
-        5: punctuation.section.parameters.begin.rux
-      push: function-parameters
-    # Return type arrow
-    - match: '(->)\s*([A-Za-z_][A-Za-z0-9_<>]*)'
-      captures:
-        1: punctuation.separator.arrow.rux
-        2: storage.type.return.rux
-    # Opening brace — replace this context with function-body (so its pop returns to main)
-    - match: '\{'
-      scope: punctuation.section.block.begin.rux
-      set: function-body
-    # Fallback: unexpected non-whitespace means no body — exit cleanly
-    - match: '(?=\S)'
-      pop: true
+      push:
+        - meta_scope: meta.function.definition.rux
+        - match: '(?<=\})|(?<=;)'
+          pop: true
+        - match: '\s+([a-zA-Z_][a-zA-Z0-9_]*)(?:\s*(<)\s*([A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)\s*(>))?(\()'
+          captures:
+            1: entity.name.function.rux
+            2: punctuation.definition.generic.begin.rux
+            3: entity.name.type.rux
+            4: punctuation.definition.generic.end.rux
+            5: punctuation.section.parameters.begin.rux
+          push: function-parameters
+        - include: function-return-tuple
+        - include: function-return-type
+        - match: '\{'
+          scope: punctuation.section.block.begin.rux
+          push: function-body
 
   function-parameters:
     - match: '\)'
       scope: punctuation.section.parameters.end.rux
       pop: true
-    # Parameter name (before : or ,)
     - match: '\b([A-Za-z_][A-Za-z0-9_]*)\b(?=\s*(?:,|:))'
       captures:
         1: variable.parameter.rux
-    # Type annotation: : *const TypeName
     - match: '(:\s*)\**(\s*const)?\s*([A-Za-z_][A-Za-z0-9_<>]*)'
       captures:
         1: punctuation.separator.type.rux
         2: storage.modifier.rux
         3: entity.name.type.rux
-    - match: ","
+    - match: ','
       scope: punctuation.separator.parameter.rux
     - include: constants
     - include: types
+
+  function-return-tuple:
+    - match: '\s*(->)\s*(\()'
+      captures:
+        1: punctuation.separator.arrow.rux
+        2: punctuation.section.tuple.begin.rux
+      push:
+        - meta_scope: meta.return.type.tuple.rux
+        - match: '\)'
+          scope: punctuation.section.tuple.end.rux
+          pop: true
+        - match: '\*+'
+          scope: keyword.operator.pointer.rux
+        - match: '\bconst\b'
+          scope: storage.modifier.rux
+        - include: types
+        - match: '\b[A-Za-z_][A-Za-z0-9_<>]*\b'
+          scope: storage.type.return.rux
+        - match: ','
+          scope: punctuation.separator.parameter.rux
+
+  function-return-type:
+    - match: '\s*(->)\s*(\**)(\s*const)?\s*([A-Za-z_][A-Za-z0-9_<>]*)'
+      captures:
+        1: punctuation.separator.arrow.rux
+        2: keyword.operator.pointer.rux
+        3: storage.modifier.rux
+        4: storage.type.return.rux
 
   function-body:
     - meta_scope: meta.block.rux
@@ -143,15 +176,15 @@ contexts:
     - include: punctuation
     - include: strings
 
-  # ── Keywords ─────────────────────────────────────────────────────────────────
-
   keywords:
-    - match: '\b(break|continue|do|else|for|if|return|while)\b'
+    - match: '\b(break|continue|do|else|for|if|in|loop|match|return|while)\b'
       scope: keyword.control.rux
     - match: '\b(const|let|var)\b'
       scope: storage.modifier.rux
     - match: '\b(class)\b'
       scope: keyword.declaration.class.rux storage.type.rux
+    - match: '\b(interface)\b'
+      scope: keyword.declaration.interface.rux storage.type.rux
     - match: '\b(enum)\b'
       scope: keyword.declaration.enum.rux storage.type.rux
     - match: '\b(struct)\b'
@@ -162,19 +195,27 @@ contexts:
       scope: keyword.declaration.type.rux storage.type.rux
     - match: '(\^|\||\|\||&&|<<|>>|!)(?!=)'
       scope: keyword.operator.logical.rux
-    - match: '\b(as|async|import|export)\b'
+    - match: '\b(as|async|extend|extern|import|export|module)\b'
       scope: keyword.other.rux
 
-  # ── Punctuation ───────────────────────────────────────────────────────────────
-
   punctuation:
-    - match: ","
+    - match: '\+|-(?!>)|\*|/|%'
+      scope: keyword.operator.arithmetic.rux
+    - match: '&'
+      scope: keyword.operator.address.rux
+    - match: '\?'
+      scope: keyword.operator.ternary.rux
+    - match: ','
       scope: punctuation.separator.parameter.rux
+    - match: '\.\.'
+      scope: keyword.operator.range.rux
     - match: '\.'
       scope: punctuation.accessor.dot.rux
-    - match: ":"
+    - match: '::'
+      scope: punctuation.accessor.double-colon.rux
+    - match: ':'
       scope: punctuation.separator.type.rux
-    - match: ";"
+    - match: ';'
       scope: punctuation.terminator.statement.rux
     - match: '\['
       scope: punctuation.section.brackets.begin.rux
@@ -188,12 +229,10 @@ contexts:
       scope: punctuation.section.block.begin.rux
     - match: '\}'
       scope: punctuation.section.block.end.rux
-    - match: "<"
+    - match: '<'
       scope: punctuation.definition.generic.begin.rux
-    - match: ">"
+    - match: '>'
       scope: punctuation.definition.generic.end.rux
-
-  # ── Strings ───────────────────────────────────────────────────────────────────
 
   strings:
     - match: '"'
@@ -207,8 +246,6 @@ contexts:
         - match: '\\.'
           scope: constant.character.escape.rux
 
-  # ── Types ─────────────────────────────────────────────────────────────────────
-
   types:
     - match: '\b(int|int8|int16|int32|int64|int128|int256|int512|uint|uint8|uint16|uint32|uint64|uint128|uint256|uint512)\b'
       scope: entity.name.type.int.rux
@@ -218,6 +255,8 @@ contexts:
       scope: entity.name.type.char.rux
     - match: '\b(bool|bool8|bool16|bool32|bool64|bool128|bool256|bool512)\b'
       scope: entity.name.type.bool.rux
+    - match: '\bopaque\b'
+      scope: entity.name.type.rux
     - match: '\b(struct)\s+(_?[A-Z][A-Za-z0-9_]*)\b'
       captures:
         1: keyword.declaration.struct.rux storage.type.rux
