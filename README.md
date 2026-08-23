@@ -49,4 +49,4 @@ Initial release with full syntax highlighting for the Rux source files.
 
 ## License
 
-[MIT](LICENSE)
+Licensed under the [MIT License](LICENSE.md).
